@@ -2,6 +2,7 @@
 #include <iostream>
 #include "json.hpp"
 #include "PID.h"
+#include "Twiddle.h"
 #include <math.h>
 
 // for convenience
@@ -11,6 +12,12 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+
+void reset_simulator(uWS::WebSocket<uWS::SERVER>& ws){
+	std::cout << "Reset Simulator" << std::endl;
+	std::string msg("42[\"reset\",{}]");
+	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+}
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -33,9 +40,16 @@ int main()
   uWS::Hub h;
 
   PID pid;
+  pid.Init(0.182805, 0.0028019, 2.9458); // best parameter
+  Twiddle twiddle(pid, 400);
   // TODO: Initialize the pid variable.
+//  pid.Init(0.2, 0.004, 3.0); // first
+//  pid.Init(0.1, 0.004, 2.0);
+//  pid.Init(0.071769, 0.00411344, 0.974954);
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  bool useTwiddle = true;
+
+  h.onMessage([&pid, &twiddle, &useTwiddle](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -57,15 +71,25 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          pid.UpdateError(cte);
+          steer_value = pid.TotalError();
 
+          if (useTwiddle) {
+        	  twiddle.twiddle(cte);
+//        	  std::cout << "distance: " << twiddle.distance << " reached: " << twiddle.distanceReached() << std::endl;
+        	  if (twiddle.distance == 0) {
+        		  reset_simulator(ws);
+        	  }
+          }
+
+
+          // DEBUG
+//          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
           json msgJson;
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = 0.3;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+//          std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
