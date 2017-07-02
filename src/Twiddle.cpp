@@ -15,6 +15,7 @@ Twiddle::Twiddle(PID pid, int maxDistance) {
 	this->maxDistance = maxDistance;
 	this->i = 0;
 	this->flag = true;
+	this->firstFlag = true;
 	this->pid = pid;
 	dp = {pid.Kp/4, pid.Ki/4, 0.1};
 }
@@ -40,18 +41,6 @@ void Twiddle::twiddle(double cte) {
 
 	if (this->distanceReached()) {
 
-		if (firstFlag) {
-			switch (i) {
-			case 0:
-				pid.Kp += dp[i];
-				break;
-			case 1:
-				pid.Ki += dp[i];
-				break;
-			case 2:
-				pid.Kd += dp[i];
-			}
-		}
 		double avgError = error / maxDistance;
 
 		if (!isInitialized) {
@@ -63,55 +52,56 @@ void Twiddle::twiddle(double cte) {
 									<< std::endl;
 		} else {
 
-			if (avgError < bestError) {
+			if (firstFlag) {
+				switch (i) {
+				case 0:
+					pid.Kp += dp[i];
+					break;
+				case 1:
+					pid.Ki += dp[i];
+					break;
+				case 2:
+					pid.Kd += dp[i];
+				}
+				firstFlag = false;
+				flag = true;
+			} else if (avgError < bestError) {
 				bestError = avgError;
 				dp[i] *= 1.1;
-//				i = (i + 1) % 3;
-				flag = true;
+				i = (i + 1) % 3;
+				firstFlag = true;
 				std::cout << "New best Kp: " << pid.Kp << " Ki: " << pid.Ki
 						<< " Kd: " << pid.Kd << " Ki: " << pid.Ki << " Error: "
 						<< bestError << " Sum dpi: " << sumDP()
 						<< std::endl;
-			} else {
-				if (flag) {
-					flag = false;
-				} else {
-					switch (i) {
-					case 0:
-						pid.Kp += dp[i];
-						break;
-					case 1:
-						pid.Ki += dp[i];
-						break;
-					case 2:
-						pid.Kd += dp[i];
-					}
-					dp[i] *= 0.9;
-//					i = (i + 1) % 3;
-					flag = true;
+			} else if (flag) {
+				switch (i) {
+				case 0:
+					pid.Kp -= 2 * dp[i];
+					break;
+				case 1:
+					pid.Ki -= 2 * dp[i];
+					break;
+				case 2:
+					pid.Kd -= 2 * dp[i];
 				}
+				flag = false;
+			} else {
+				switch (i) {
+				case 0:
+					pid.Kp += dp[i];
+					break;
+				case 1:
+					pid.Ki += dp[i];
+					break;
+				case 2:
+					pid.Kd += dp[i];
+				}
+				dp[i] *= 0.9;
+				firstFlag = true;
+				i = (i + 1) % 3;
 			}
 
-			switch (i) {
-			case 0:
-				if (flag)
-					pid.Kp += dp[i];
-				else
-					pid.Kp -= 2 * dp[i];
-				break;
-			case 1:
-				if (flag)
-					pid.Ki += dp[i];
-				else
-					pid.Ki -= 2 * dp[i];
-				break;
-			case 2:
-				if (flag)
-					pid.Kd += dp[i];
-				else
-					pid.Kd -= 2 * dp[i];
-			}
-			i = (i + 1) % 3;
 		}
 		std::cout << "Updated Kp: " << pid.Kp << " Ki: " << pid.Ki << " Kd: " << pid.Kd << std::endl;
 		distance = 0;
