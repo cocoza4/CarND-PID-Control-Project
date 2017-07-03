@@ -5,6 +5,8 @@
 #include "Twiddle.h"
 #include <math.h>
 
+#define TIMESTEPS 2000
+
 // for convenience
 using json = nlohmann::json;
 
@@ -40,14 +42,10 @@ int main()
   uWS::Hub h;
 
   PID pid;
-  pid.Init(0.182805, 0.0028019, 2.9458); // best parameter
-  Twiddle twiddle(pid, 400);
-  // TODO: Initialize the pid variable.
-//  pid.Init(0.2, 0.004, 3.0); // first
-//  pid.Init(0.1, 0.004, 2.0);
-//  pid.Init(0.071769, 0.00411344, 0.974954);
+  pid.Init(0.137922, 0.0028019, 3.0358); // best parameter
+  Twiddle twiddle(pid, TIMESTEPS);
 
-  bool useTwiddle = true;
+  bool useTwiddle = false; // set to false to ignore twiddle
 
   h.onMessage([&pid, &twiddle, &useTwiddle](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
